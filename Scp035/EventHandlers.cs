@@ -8,6 +8,7 @@ namespace Scp035
     using Exiled.API.Features;
     using MEC;
     using System.Collections.Generic;
+    using System.Linq;
     using PlayerHandlers = Exiled.Events.Handlers.Player;
     using Scp106Handlers = Exiled.Events.Handlers.Scp106;
     using ServerHandlers = Exiled.Events.Handlers.Server;
@@ -22,14 +23,39 @@ namespace Scp035
         private static readonly List<string> FfPlayers = new List<string>();
         private static bool _isRotating;
 
-        private void OnRoundStart()
+        private void OnChangingRole(ChangingRoleEventArgs ev)
         {
-            _isRotating = true;
-            ScpPickups.Clear();
-            Scp035Data.AllScp035.Clear();
+            if (ev.Player.IsScp035())
+                DestroyScp035(ev.Player);
+        }
 
-            CoroutineHandles.Add(Timing.RunCoroutine(CorrodePlayers()));
-            CoroutineHandles.Add(Timing.RunCoroutine(RunSpawning()));
+        private void OnContaining(ContainingEventArgs ev)
+        {
+            if (ev.Player.IsScp035() && !_config.ScpFriendlyFire)
+                ev.IsAllowed = false;
+        }
+
+        private void OnDied(DiedEventArgs ev)
+        {
+            if (ev.Target.IsScp035())
+                DestroyScp035(ev.Target);
+        }
+
+        private void OnEndingRound(EndingRoundEventArgs ev)
+        {
+            List<Team> pList = Player.List.Where(x => !x.IsScp035()).Select(x => x.Team).ToList();
+            bool scp035Exists = Scp035Data.AllScp035.Count > 0;
+            
+            if (!pList.Contains(Team.CHI) && !pList.Contains(Team.CDP) && !pList.Contains(Team.MTF) && !pList.Contains(Team.RSC) && (pList.Contains(Team.SCP) && scp035Exists || !pList.Contains(Team.SCP) && scp035Exists) ||
+                _config.WinWithTutorials && !pList.Contains(Team.CHI) && !pList.Contains(Team.CDP) && !pList.Contains(Team.MTF) && !pList.Contains(Team.RSC) && pList.Contains(Team.TUT) && scp035Exists)
+            {
+                ev.LeadingTeam = LeadingTeam.Anomalies;
+                ev.IsRoundEnded = true;
+            }
+            else if (scp035Exists && !pList.Contains(Team.SCP) && (pList.Contains(Team.CDP) || pList.Contains(Team.CHI) || pList.Contains(Team.MTF) || pList.Contains(Team.RSC)))
+            {
+                ev.IsAllowed = false;
+            }
         }
 
         private static void OnEscaping(EscapingEventArgs ev)
@@ -38,26 +64,13 @@ namespace Scp035
                 ev.IsAllowed = false;
         }
 
-        private static void OnRoundEnded(RoundEndedEventArgs ev)
+        private static void OnEscapingPocketDimension(EscapingPocketDimensionEventArgs ev)
         {
-            foreach (var coroutine in CoroutineHandles)
-                Timing.KillCoroutines(coroutine);
-
-            CoroutineHandles.Clear();
-        }
-
-        private void OnPickingUpItem(PickingUpItemEventArgs ev)
-        {
-            if (!ScpPickups.Contains(ev.Pickup))
+            if (!ev.Player.IsScp035())
                 return;
 
             ev.IsAllowed = false;
-            var players = AvailablePlayers();
-            if (!_config.Scp035Modifiers.SelfInflict && players.Count == 0)
-                return;
-            
-            ev.Pickup.Delete();
-            AwakeScp035(ev.Player, _config.Scp035Modifiers.SelfInflict ? null : players[Random.Next(players.Count)]);
+            ExitPd(ev.Player);
         }
 
         private void OnHurting(HurtingEventArgs ev)
@@ -83,22 +96,42 @@ namespace Scp035
             }
         }
 
-        private void OnDied(DiedEventArgs ev)
+        private void OnPickingUpItem(PickingUpItemEventArgs ev)
         {
-            if (ev.Target.IsScp035())
-                DestroyScp035(ev.Target);
+            if (!ScpPickups.Contains(ev.Pickup))
+                return;
+
+            ev.IsAllowed = false;
+            var players = AvailablePlayers();
+            if (!_config.Scp035Modifiers.SelfInflict && players.Count == 0)
+                return;
+
+            ev.Pickup.Delete();
+            AwakeScp035(ev.Player, _config.Scp035Modifiers.SelfInflict ? null : players[Random.Next(players.Count)]);
+        }
+
+        private static void OnRoundEnded(RoundEndedEventArgs ev)
+        {
+            foreach (var coroutine in CoroutineHandles)
+                Timing.KillCoroutines(coroutine);
+
+            CoroutineHandles.Clear();
+        }
+
+        private void OnRoundStart()
+        {
+            _isRotating = true;
+            ScpPickups.Clear();
+            Scp035Data.AllScp035.Clear();
+
+            CoroutineHandles.Add(Timing.RunCoroutine(CorrodePlayers()));
+            CoroutineHandles.Add(Timing.RunCoroutine(RunSpawning()));
         }
 
         private void OnPocketDimensionEnter(EnteringPocketDimensionEventArgs ev)
         {
             if (ev.Player.IsScp035() && !_config.ScpFriendlyFire)
                 ev.IsAllowed = false;
-        }
-
-        private void OnChangingRole(ChangingRoleEventArgs ev)
-        {
-            if (ev.Player.IsScp035())
-                DestroyScp035(ev.Player);
         }
 
         private static void OnShooting(ShootingEventArgs ev)
@@ -130,12 +163,6 @@ namespace Scp035
                 DestroyScp035(ev.Player);
         }
 
-        private void OnContaining(ContainingEventArgs ev)
-        {
-            if (ev.Player.IsScp035() && !_config.ScpFriendlyFire)
-                ev.IsAllowed = false;
-        }
-
         private void OnInsertingGeneratorTablet(InsertingGeneratorTabletEventArgs ev)
         {
             if (ev.Player.IsScp035() && !_config.ScpFriendlyFire)
@@ -149,27 +176,6 @@ namespace Scp035
 
             ev.IsAllowed = false;
             ExitPd(ev.Player);
-        }
-
-        private static void OnEscapingPocketDimension(EscapingPocketDimensionEventArgs ev)
-        {
-            if (!ev.Player.IsScp035())
-                return;
-
-            ev.IsAllowed = false;
-            ExitPd(ev.Player);
-        }
-
-        private void OnUsingMedicalItem(UsingMedicalItemEventArgs ev)
-        {
-            if (!ev.Player.IsScp035())
-                return;
-
-            if (ev.Item.IsMedical() && (!_config.Scp035Modifiers.CanHealBeyondHostHp &&
-                                        ev.Player.Health >=
-                                        ev.Player.ReferenceHub.characterClassManager.CurRole.maxHP ||
-                                        !_config.Scp035Modifiers.CanUseMedicalItems))
-                ev.IsAllowed = false;
         }
 
         private void OnUsedMedicalItem(UsedMedicalItemEventArgs ev)
@@ -187,6 +193,18 @@ namespace Scp035
                 else
                     ev.Player.Health = maxHp;
             }
+        }
+
+        private void OnUsingMedicalItem(UsingMedicalItemEventArgs ev)
+        {
+            if (!ev.Player.IsScp035())
+                return;
+
+            if (ev.Item.IsMedical() && (!_config.Scp035Modifiers.CanHealBeyondHostHp &&
+                                        ev.Player.Health >=
+                                        ev.Player.ReferenceHub.characterClassManager.CurRole.maxHP ||
+                                        !_config.Scp035Modifiers.CanUseMedicalItems))
+                ev.IsAllowed = false;
         }
 
         internal void SubscribeAll()
@@ -207,6 +225,7 @@ namespace Scp035
 
             Scp106Handlers.Containing += OnContaining;
 
+            ServerHandlers.EndingRound += OnEndingRound;
             ServerHandlers.RoundEnded += OnRoundEnded;
             ServerHandlers.RoundStarted += OnRoundStart;
         }
@@ -229,6 +248,7 @@ namespace Scp035
 
             Scp106Handlers.Containing -= OnContaining;
 
+            ServerHandlers.EndingRound -= OnEndingRound;
             ServerHandlers.RoundEnded -= OnRoundEnded;
             ServerHandlers.RoundStarted -= OnRoundStart;
         }

@@ -9,6 +9,7 @@ namespace Scp035.Configs
         public bool CorrodeTrail { get; private set; } = false;
         public int CorrodeTrailInterval { get; private set; } = 5;
         public bool ScpFriendlyFire { get; private set; } = false;
+        public bool WinWithTutorials { get; private set; } = true;
         public bool TutorialFriendlyFire { get; private set; } = true;
         public CorrodeHost CorrodeHost { get; private set; } = new CorrodeHost();
         public CorrodePlayers CorrodePlayers { get; private set; } = new CorrodePlayers();
