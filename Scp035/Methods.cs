@@ -1,132 +1,103 @@
 namespace Scp035
 {
-    using API;
+    using Configs;
     using Exiled.API.Enums;
     using Exiled.API.Extensions;
     using Exiled.API.Features;
     using MEC;
+    using Mirror;
     using System.Collections.Generic;
     using System.Linq;
     using UnityEngine;
     using Random = System.Random;
 
-    public partial class EventHandlers
+    public static class Methods
     {
+        private static readonly Config Config = Scp035.Instance.Config;
+
+        internal static readonly List<CoroutineHandle> CoroutineHandles = new List<CoroutineHandle>();
+        internal static readonly List<string> FriendlyFireUsers = new List<string>();
+        internal static readonly List<Pickup> ScpPickups = new List<Pickup>();
+        internal static bool IsRotating;
+
         private static readonly Random Random = new Random();
 
-        private IEnumerator<float> RunSpawning()
+        internal static IEnumerator<float> RunSpawning()
         {
             while (Round.IsStarted)
             {
-                yield return Timing.WaitForSeconds(_config.Scp035Modifiers.RotateInterval);
-                if (_isRotating)
-                    SpawnPickup();
+                yield return Timing.WaitForSeconds(Config.ItemSpawning.RotateInterval);
+                Log.Debug($"Running {nameof(RunSpawning)} loop.", Config.Debug);
+                if (IsRotating)
+                    SpawnPickups(Config.ItemSpawning.InfectedItemCount);
             }
         }
 
-        private void SpawnPickup()
+        internal static List<Pickup> SpawnPickups(int amount)
         {
+            Log.Debug($"Running {nameof(SpawnPickups)}.", Config.Debug);
             RemoveScpPickups();
-            if (!_config.Scp035Modifiers.SelfInflict && AvailablePlayers().Count == 0)
-                return;
 
-            List<Pickup> pickups = Object.FindObjectsOfType<Pickup>().Where(pickup => !ScpPickups.Contains(pickup)).ToList();
-            for (int i = 0; i < _config.ItemSpawning.InfectedItemCount; i++)
+            List<Pickup> pickups = Config.ItemSpawning.OnlyMimicSpawned ? Pickup.Instances.Where(pickup => !ScpPickups.Contains(pickup)).ToList() : Object.FindObjectsOfType<Pickup>().Where(pickup => !ScpPickups.Contains(pickup)).ToList();
+            if (Warhead.IsDetonated)
             {
+                pickups.RemoveAll(pickup => Map.FindParentRoom(pickup.gameObject).Type != RoomType.Surface);
+            }
+
+            List<Pickup> returnPickups = new List<Pickup>();
+            for (int i = 0; i < amount; i++)
+            {
+                if (pickups.Count == 0)
+                    return returnPickups;
+
                 Pickup mimicAs = pickups[Random.Next(pickups.Count)];
                 Transform transform = mimicAs.transform;
-                Pickup scpPickup = _config.ItemSpawning.PossibleItems[Random.Next(_config.ItemSpawning.PossibleItems.Count)]
+                Pickup scpPickup = Config.ItemSpawning
+                    .PossibleItems[Random.Next(Config.ItemSpawning.PossibleItems.Length)]
                     .Spawn(0, transform.position, transform.rotation);
-
+                Log.Debug($"Spawned Scp035 item with ItemType of {scpPickup.itemId} at {scpPickup.transform.position}");
                 ScpPickups.Add(scpPickup);
+                returnPickups.Add(scpPickup);
+
                 pickups.Remove(mimicAs);
             }
+
+            return returnPickups;
         }
 
-        internal void AwakeScp035(Player player, Player toReplace = null)
-        {
-            Scp035Data.AllScp035.Add(player);
-            _isRotating = false;
-
-            if (toReplace != null && player != toReplace)
-            {
-                List<Inventory.SyncItemInfo> items = new List<Inventory.SyncItemInfo>();
-                foreach (var item in toReplace.Inventory.items)
-                    items.Add(item);
-
-                Vector3 position = toReplace.Position;
-                player.Role = toReplace.Role;
-                player.ResetInventory(items);
-
-                toReplace.Role = RoleType.Spectator;
-                Timing.CallDelayed(0.5f, () => player.Position = position);
-            }
-
-            uint ammo = _config.Scp035Modifiers.AmmoAmount;
-            player.Ammo[(int) AmmoType.Nato556] = ammo;
-            player.Ammo[(int) AmmoType.Nato762] = ammo;
-            player.Ammo[(int) AmmoType.Nato9] = ammo;
-
-            player.ReferenceHub.nicknameSync.ShownPlayerInfo &= ~PlayerInfoArea.Role;
-            player.CustomInfo = "<color=#FF0000>SCP-035</color>";
-
-            Scp096.TurnedPlayers.Add(player);
-            Scp173.TurnedPlayers.Add(player);
-
-            player.Health = player.MaxHealth = _config.Scp035Modifiers.Health;
-            player.Scale = _config.Scp035Modifiers.Scale.ToVector3();
-            player.Broadcast(_config.Scp035Modifiers.SpawnBroadcast);
-
-            if (_config.CorrodeHost.IsEnabled)
-                CoroutineHandles.Add(Timing.RunCoroutine(CorrodeHost(player)));
-        }
-
-        private void DestroyScp035(Player player)
-        {
-            Scp035Data.AllScp035.Remove(player);
-            if (Scp035Data.AllScp035.Count == 0)
-                _isRotating = true;
-            
-            Scp096.TurnedPlayers.Remove(player);
-            Scp173.TurnedPlayers.Remove(player);
-            player.CustomInfo = string.Empty;
-            player.ReferenceHub.nicknameSync.ShownPlayerInfo |= PlayerInfoArea.Role;
-            player.MaxHealth = player.ReferenceHub.characterClassManager.CurRole.maxHP;
-            
-            if (_config.ItemSpawning.SpawnAfterDeath)
-                SpawnPickup();
-        }
-
-        private IEnumerator<float> CorrodeHost(Player player)
+        internal static IEnumerator<float> CorrodeHost(Player player)
         {
             while (player != null && player.IsAlive)
             {
-                player.Hurt(_config.CorrodeHost.Damage);
-                yield return Timing.WaitForSeconds(_config.CorrodeHost.Interval);
+                yield return Timing.WaitForSeconds(Config.CorrodeHost.Interval);
+                Log.Debug($"Running {nameof(CorrodeHost)} loop.", Config.Debug);
+                player.Hurt(Config.CorrodeHost.Damage);
             }
         }
 
-        private IEnumerator<float> CorrodePlayers()
+        internal static IEnumerator<float> CorrodePlayers()
         {
-            if (_config.CorrodePlayers.IsEnabled)
+            if (!Config.CorrodePlayers.IsEnabled)
                 yield break;
 
             while (Round.IsStarted)
             {
-                yield return Timing.WaitForSeconds(_config.CorrodePlayers.Interval);
-                if (Scp035Data.AllScp035.Count == 0)
+                yield return Timing.WaitForSeconds(Config.CorrodePlayers.Interval);
+                Log.Debug($"Running {nameof(CorrodePlayers)} loop.", Config.Debug);
+                List<Player> scp035List = API.AllScp035.ToList();
+                if (scp035List.IsEmpty())
                     continue;
 
                 List<Player> players = new List<Player>();
                 foreach (var player in Player.List)
                 {
-                    if (!_config.ScpFriendlyFire && player.IsScp)
+                    if (!Config.ScpFriendlyFire && player.IsScp)
                         continue;
 
-                    if (!_config.TutorialFriendlyFire && player.Role == RoleType.Tutorial)
+                    if (!Config.TutorialFriendlyFire && player.Role == RoleType.Tutorial)
                         continue;
 
-                    if (player.IsScp035())
+                    if (API.IsScp035(player))
                         continue;
 
                     if (player.IsAlive)
@@ -135,9 +106,9 @@ namespace Scp035
 
                 foreach (var player in players)
                 {
-                    foreach (var scp035 in Scp035Data.AllScp035)
+                    foreach (var scp035 in scp035List)
                     {
-                        if (Vector3.Distance(scp035.Position, player.Position) <= _config.CorrodePlayers.Distance)
+                        if (Vector3.Distance(scp035.Position, player.Position) <= Config.CorrodePlayers.Distance)
                         {
                             CorrodePlayer(player);
                         }
@@ -146,17 +117,16 @@ namespace Scp035
             }
         }
 
-        private void CorrodePlayer(Player player)
+        private static void CorrodePlayer(Player player)
         {
-            player.Hurt(_config.CorrodePlayers.Damage, DamageTypes.Nuke);
-            if (!_config.CorrodePlayers.LifeSteal || Scp035Data.AllScp035.Count == 0)
+            player.Hurt(Config.CorrodePlayers.Damage, DamageTypes.Nuke);
+            List<Player> scp035List = API.AllScp035.ToList();
+            if (!Config.CorrodePlayers.LifeSteal || scp035List.IsEmpty())
                 return;
 
-            foreach (var scp035 in Scp035Data.AllScp035)
-                HealPlayer(scp035, _config.CorrodePlayers.Damage);
+            foreach (var scp035 in scp035List)
+                HealPlayer(scp035, Config.CorrodePlayers.Damage);
         }
-
-        // Helper methods below this point
 
         private static void HealPlayer(Player player, int amount)
         {
@@ -170,36 +140,26 @@ namespace Scp035
         {
             foreach (var pickup in ScpPickups)
             {
+                if (pickup.InUse)
+                    pickup.Locked = true;
+
                 if (pickup != null)
-                    pickup.Delete();
+                    NetworkServer.Destroy(pickup.gameObject);
             }
 
             ScpPickups.Clear();
         }
 
-        private static void GrantFf(Player player)
+        internal static void GrantFf(Player player)
         {
             player.IsFriendlyFireEnabled = true;
-            FfPlayers.Add(player.UserId);
+            FriendlyFireUsers.Add(player.UserId);
         }
 
-        private static void RemoveFf(Player player)
+        internal static void RemoveFf(Player player)
         {
             player.IsFriendlyFireEnabled = false;
-            FfPlayers.Remove(player.UserId);
-        }
-
-        private static void ExitPd(Player player)
-        {
-            if (!Warhead.IsDetonated)
-                player.Position = RoleType.Scp096.GetRandomSpawnPoint();
-            else
-                player.Kill();
-        }
-
-        private static List<Player> AvailablePlayers()
-        {
-            return Player.Get(Team.RIP).Where(ply => !ply.IsOverwatchEnabled).ToList();
+            FriendlyFireUsers.Remove(player.UserId);
         }
     }
 }

@@ -1,6 +1,5 @@
 namespace Scp035.Patches
 {
-    using API;
     using Exiled.API.Features;
     using Grenades;
     using HarmonyLib;
@@ -12,7 +11,7 @@ namespace Scp035.Patches
         private static void Postfix(FlashGrenade __instance)
         {
             Player thrower = Player.Get(__instance.thrower.gameObject);
-            foreach (var scp035 in Scp035Data.AllScp035)
+            foreach (var scp035 in API.AllScp035)
             {
                 if (thrower != null && scp035 != null && thrower.Id != scp035.Id && thrower.Team == scp035.Team)
                 {

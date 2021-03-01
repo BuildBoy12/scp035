@@ -1,6 +1,5 @@
 namespace Scp035.Patches
 {
-    using API;
     using Exiled.API.Features;
     using HarmonyLib;
 
@@ -11,15 +10,15 @@ namespace Scp035.Patches
 
         private static void Prefix(FootstepSync __instance)
         {
-            if (!Scp035.Singleton.Config.CorrodeTrail)
+            if (!Scp035.Instance.Config.CorrodeTrail)
                 return;
 
             Player player = Player.Get(__instance.gameObject);
             _count++;
 
-            foreach (var scp035 in Scp035Data.AllScp035)
+            foreach (var scp035 in API.AllScp035)
             {
-                if (player.Id == scp035?.Id && _count >= Scp035.Singleton.Config.CorrodeTrailInterval)
+                if (player.Id == scp035?.Id && _count >= Scp035.Instance.Config.CorrodeTrailInterval)
                 {
                     player.ReferenceHub.characterClassManager.RpcPlaceBlood(player.Position, 1, 2f);
                     _count = 0;

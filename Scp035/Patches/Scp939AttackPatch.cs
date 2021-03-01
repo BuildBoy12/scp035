@@ -1,6 +1,5 @@
 namespace Scp035.Patches
 {
-    using API;
     using Exiled.API.Enums;
     using Exiled.API.Features;
     using HarmonyLib;
@@ -12,7 +11,7 @@ namespace Scp035.Patches
         private static void Postfix(GameObject target)
         {
             Player player = Player.Get(target);
-            if (player.IsScp035() && !Scp035.Singleton.Config.ScpFriendlyFire)
+            if (API.IsScp035(player) && !Scp035.Instance.Config.ScpFriendlyFire)
                 player.DisableEffect(EffectType.Amnesia);
         }
     }
