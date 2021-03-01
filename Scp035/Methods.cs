@@ -85,7 +85,7 @@ namespace Scp035
                 yield return Timing.WaitForSeconds(Config.CorrodePlayers.Interval);
                 Log.Debug($"Running {nameof(CorrodePlayers)} loop.", Config.Debug);
                 List<Player> scp035List = API.AllScp035.ToList();
-                if (scp035List.IsEmpty())
+                if (scp035List.Count == 0)
                     continue;
 
                 List<Player> players = new List<Player>();

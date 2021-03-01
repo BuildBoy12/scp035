@@ -4,7 +4,6 @@ namespace Scp035.Commands.SubCommands
     using Exiled.Permissions.Extensions;
     using NorthwoodLib.Pools;
     using System;
-    using System.Collections.Generic;
     using System.Text;
 
     public class SpawnItems : ICommand
@@ -29,9 +28,8 @@ namespace Scp035.Commands.SubCommands
                 return false;
             }
 
-            List<Pickup> items = API.SpawnItems(amount);
             StringBuilder stringBuilder = StringBuilderPool.Shared.Rent().AppendLine("Spawned Items:");
-            foreach (Pickup item in items)
+            foreach (Pickup item in API.SpawnItems(amount))
             {
                 stringBuilder.AppendLine($"ItemType: {item.itemId} - Position: {item.transform.position}");
             }

@@ -22,7 +22,7 @@ namespace Scp035.Patches
                         hub.playerEffectsController.GetEffect<CustomPlayerEffects.Flashed>();
                     CustomPlayerEffects.Deafened effect2 =
                         hub.playerEffectsController.GetEffect<CustomPlayerEffects.Deafened>();
-                    if (effect != null && __instance.thrower != null && Flashable(thrower.ReferenceHub,
+                    if (effect != null && __instance.thrower != null && IsFlashable(thrower.ReferenceHub,
                         scp035.ReferenceHub,
                         position, __instance._ignoredLayers))
                     {
@@ -48,7 +48,7 @@ namespace Scp035.Patches
             }
         }
 
-        private static bool Flashable(ReferenceHub throwerPlayerHub, ReferenceHub targetPlayerHub,
+        private static bool IsFlashable(ReferenceHub throwerPlayerHub, ReferenceHub targetPlayerHub,
             Vector3 sourcePosition, int ignoreMask)
         {
             return targetPlayerHub != throwerPlayerHub && !Physics.Linecast(sourcePosition,

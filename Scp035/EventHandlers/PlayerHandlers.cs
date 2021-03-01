@@ -29,7 +29,7 @@ namespace Scp035.EventHandlers
             }
             
             List<Player> players = Player.Get(Team.RIP).Where(ply => !ply.IsOverwatchEnabled).ToList();
-            if (!Config.Scp035Modifiers.SelfInflict && players.IsEmpty())
+            if (!Config.Scp035Modifiers.SelfInflict && players.Count == 0)
             {
                 Log.Debug("There were no spectators to spawn Scp035 as, cancelling pickup.", Config.Debug);
                 return;

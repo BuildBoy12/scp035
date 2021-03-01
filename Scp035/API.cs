@@ -13,6 +13,6 @@ namespace Scp035
 
         public static void Spawn035(Player player, Player toReplace = null) => player.GameObject.AddComponent<Scp035Component>().AwakeFunc(toReplace);
 
-        public static List<Pickup> SpawnItems(int amount) => Methods.SpawnPickups(amount);
+        public static IEnumerable<Pickup> SpawnItems(int amount) => Methods.SpawnPickups(amount);
     }
 }
